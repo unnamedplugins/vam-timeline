@@ -127,6 +127,8 @@ namespace VamTimeline
             newTarget.weight = origTarget.weight;
             newTarget.controlPosition = origTarget.controlPosition;
             newTarget.controlRotation = origTarget.controlPosition;
+            newTarget.positionState = origTarget.positionState;
+            newTarget.rotationState = origTarget.rotationState;
             return newTarget;
         }
     }

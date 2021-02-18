@@ -385,7 +385,7 @@ namespace VamTimeline
         public bool temporarilyEnabled { get; set; }
         public bool playbackMainInLayer;
         public float playbackBlendRate;
-        public string playbackScheduledNextAnimationName;
+        public string playbackScheduledNextAnimationName { get; set; }
         public float playbackScheduledNextTimeLeft;
 
         public float clipTime

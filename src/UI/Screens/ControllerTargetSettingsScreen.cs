@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
@@ -6,11 +7,29 @@ namespace VamTimeline
 {
     public class ControllerTargetSettingsScreen : ScreenBase
     {
+        private readonly List<string> _animatablePositionStates = new List<string> {
+            FreeControllerV3.PositionState.On.ToString(),
+            FreeControllerV3.PositionState.Comply.ToString(),
+            FreeControllerV3.PositionState.Hold.ToString(),
+            FreeControllerV3.PositionState.Lock.ToString(),
+            FreeControllerV3.PositionState.Off.ToString()
+        };
+
+        private readonly List<string> _animatableRotationStates = new List<string> {
+            FreeControllerV3.RotationState.On.ToString(),
+            FreeControllerV3.RotationState.Comply.ToString(),
+            FreeControllerV3.RotationState.Hold.ToString(),
+            FreeControllerV3.RotationState.Lock.ToString(),
+            FreeControllerV3.RotationState.Off.ToString()
+        };
+
         public const string ScreenName = "Controller settings";
         private static string _lastArg;
         private JSONStorableStringChooser _atomJSON;
         private JSONStorableStringChooser _rigidbodyJSON;
         private FreeControllerAnimationTarget _target;
+        private JSONStorableStringChooser _posStateJson;
+        private JSONStorableStringChooser _rotStateJson;
 
         public override string screenId => ScreenName;
 
@@ -31,6 +50,10 @@ namespace VamTimeline
                 return;
             }
             prefabFactory.CreateHeader(_target.name, 2);
+            
+            prefabFactory.CreateHeader("State", 1);
+
+            InitStateUI();
 
             prefabFactory.CreateHeader("Parenting", 1);
 
@@ -40,6 +63,38 @@ namespace VamTimeline
 
             InitControlUI();
             InitWeightUI();
+        }
+
+        private void InitStateUI()
+        {
+            _posStateJson = new JSONStorableStringChooser(
+                "PositionState", 
+                _animatablePositionStates, 
+                FreeControllerV3.PositionState.On.ToString(), 
+                "Position State", 
+                (string val) => {
+                    _target.positionState = val;
+                    _target.controller.currentPositionState = (FreeControllerV3.PositionState) Enum.Parse(typeof(FreeControllerV3.PositionState), val);
+                }
+            );
+            var posPop = prefabFactory.CreatePopup(_posStateJson, false, false);
+            posPop.popupPanelHeight = 500;
+            _posStateJson.valNoCallback = _target.positionState.ToString() ?? FreeControllerV3.PositionState.On.ToString();
+            
+            _rotStateJson = new JSONStorableStringChooser(
+                "RotationState", 
+                _animatableRotationStates, 
+                FreeControllerV3.RotationState.On.ToString(), 
+                "Rotation State",
+                (string val) => {
+                    _target.rotationState = val;
+                    _target.controller.currentRotationState = (FreeControllerV3.RotationState) Enum.Parse(typeof(FreeControllerV3.RotationState), val);
+                }
+            );
+
+            var rotPop = prefabFactory.CreatePopup(_rotStateJson, false, false);
+            rotPop.popupPanelHeight = 500;
+            _rotStateJson.valNoCallback = _target.rotationState.ToString() ?? FreeControllerV3.RotationState.On.ToString();
         }
 
         private void InitParentUI()
