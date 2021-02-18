@@ -14,6 +14,20 @@ namespace VamTimeline
 
     public class AtomAnimation : MonoBehaviour
     {
+        private static string _offPosString 
+        {
+            get 
+            {
+                return FreeControllerV3.PositionState.Off.ToString();
+            }
+        }
+        private static string _offRotString 
+        {
+            get
+            {
+                return FreeControllerV3.RotationState.Off.ToString();
+            }
+        }
         public class IsPlayingEvent : UnityEvent<AtomAnimationClip> { }
 
         private static readonly Regex _lastDigitsRegex = new Regex(@"^(?<name>.+)(?<index>[0-9]+)$", RegexOptions.Compiled);
@@ -659,6 +673,13 @@ namespace VamTimeline
             var totalPositionBlendWeights = 0f;
             var totalPositionControlWeights = 0f;
 
+            float lowestClipTime = 1.0f;
+            float blendDuration = -1f;
+            FreeControllerV3.PositionState? blendToPosState = null;
+            FreeControllerV3.RotationState? blendToRotState = null;
+            FreeControllerV3.PositionState? clipPosState = null;
+            FreeControllerV3.RotationState? clipRotState = null;
+
             for (var i = 0; i < targets.Count; i++)
             {
                 var target = targets[i];
@@ -669,14 +690,34 @@ namespace VamTimeline
                 if (weight < float.Epsilon) continue;
 
                 if (!target.EnsureParentAvailable()) return;
+
+                var percentPlayed = target.clip.clipTime / target.clip.animationLength + 0.0000001f;
+                if(percentPlayed < lowestClipTime) 
+                {
+                    lowestClipTime = percentPlayed;
+                    blendDuration = target.clip.blendInDuration;
+                    blendToPosState = (FreeControllerV3.PositionState) Enum.Parse(typeof(FreeControllerV3.PositionState), target.positionState);
+                    blendToRotState = (FreeControllerV3.RotationState) Enum.Parse(typeof(FreeControllerV3.RotationState), target.rotationState);
+                }
+
+                clipPosState = (FreeControllerV3.PositionState) Enum.Parse(typeof(FreeControllerV3.PositionState), target.positionState);
+                clipRotState = (FreeControllerV3.RotationState) Enum.Parse(typeof(FreeControllerV3.RotationState), target.rotationState);
+
+                if(controller.name == "headControl") 
+                {
+                    SuperController.LogMessage($"currAnim: {clip.animationNameQualified} nextAnim: {clip.playbackScheduledNextAnimationName} blendWeight: {clip.playbackBlendWeight} clipTime: {clip.clipTime} blendDuration: {blendDuration}");
+                }
+
                 var link = target.GetLinkedRigidbody();
                 var linkHasValue = link != null;
 
                 var smoothBlendWeight = Mathf.SmoothStep(0f, 1f, clip.temporarilyEnabled ? 1f : clip.playbackBlendWeight);
 
-                if (target.controlRotation && controller.currentRotationState != FreeControllerV3.RotationState.Off)
+                // if (target.controlRotation && controller.currentRotationState != FreeControllerV3.RotationState.Off)
+                // if (target.controlRotation && (target.rotationState != _offRotString || clip.clipTime < blendDuration))
+                if (target.controlRotation)
                 {
-                    var targetRotation = target.EvaluateRotation(clip.clipTime);
+                    var targetRotation = target.rotationState == _offRotString ? control.rotation : target.EvaluateRotation(clip.clipTime);
                     if (linkHasValue)
                     {
                         targetRotation = link.rotation * targetRotation;
@@ -687,15 +728,18 @@ namespace VamTimeline
                         _rotations[rotationCount] = control.transform.parent.rotation * targetRotation;
                     }
 
+                    var modifiedBlendWeight = target.rotationState == _offRotString ? 10/percentPlayed * smoothBlendWeight : smoothBlendWeight;
                     _rotationBlendWeights[rotationCount] = smoothBlendWeight;
                     totalRotationBlendWeights += smoothBlendWeight;
                     totalRotationControlWeights += weight * smoothBlendWeight;
                     rotationCount++;
                 }
 
-                if (target.controlPosition && controller.currentPositionState != FreeControllerV3.PositionState.Off)
+                // if (target.controlPosition && controller.currentPositionState != FreeControllerV3.PositionState.Off)
+                // if (target.controlPosition && (target.positionState != _offPosString || clip.clipTime < blendDuration))
+                if (target.controlPosition)
                 {
-                    var targetPosition = target.EvaluatePosition(clip.clipTime);
+                    var targetPosition = target.positionState == _offPosString ? control.position : target.EvaluatePosition(clip.clipTime);
                     if (linkHasValue)
                     {
                         targetPosition = link.transform.TransformPoint(targetPosition);
@@ -705,13 +749,74 @@ namespace VamTimeline
                         targetPosition = control.transform.parent.TransformPoint(targetPosition);
                     }
 
-                    weightedPositionSum += targetPosition * smoothBlendWeight;
-                    totalPositionBlendWeights += smoothBlendWeight;
-                    totalPositionControlWeights += weight * smoothBlendWeight;
+                    if(controller.name == "headControl") 
+                    {
+                        SuperController.LogMessage($"clip {clip.animationNameQualified} headPosTarget: {targetPosition} currentPos: {control.position}");
+                    }
+                    var modifiedBlendWeight = target.positionState == _offPosString ? 10/percentPlayed * smoothBlendWeight : smoothBlendWeight;
+                    weightedPositionSum += targetPosition * modifiedBlendWeight;
+                    totalPositionBlendWeights += modifiedBlendWeight;
+                    totalPositionControlWeights += weight * modifiedBlendWeight;
                 }
             }
 
-            if (totalRotationBlendWeights > float.Epsilon && controller.currentRotationState != FreeControllerV3.RotationState.Off)
+            if (blendToPosState != null)
+            {
+                // If blendTo or current are off, we need to do something special here
+                var blendToOff = blendToPosState.ToString() == _offPosString;
+                var controllerOff = controller.currentPositionState == FreeControllerV3.PositionState.Off;
+                if(blendToPosState != controller.currentPositionState)
+                {
+                    FreeControllerV3.PositionState desiredState;
+                    if (blendToOff || controllerOff)
+                    {
+                        desiredState = controllerOff ? FreeControllerV3.PositionState.Lock : FreeControllerV3.PositionState.Off;
+                    }
+                    else
+                    {
+                        desiredState = (FreeControllerV3.PositionState) blendToPosState;
+                    }
+                    SuperController.LogMessage($"**setting {controller.name} pos to {desiredState} from {controller.currentPositionState}");
+                    controller.currentPositionState = desiredState;
+                }
+            }
+            else
+            {
+                if(clipPosState != null && controller.currentPositionState != clipPosState)
+                {
+                    controller.currentPositionState = (FreeControllerV3.PositionState) clipPosState;
+                }
+            }
+
+            if (blendToRotState != null)
+            {
+                // If blendTo or current are off, we need to do something special here
+                var blendToOff = blendToRotState.ToString() == _offRotString;
+                var controllerOff = controller.currentRotationState == FreeControllerV3.RotationState.Off;
+                if(blendToRotState != controller.currentRotationState)
+                {
+                    FreeControllerV3.RotationState desiredState;
+                    if (blendToOff || controllerOff)
+                    {
+                        desiredState = controllerOff ? FreeControllerV3.RotationState.Lock : FreeControllerV3.RotationState.Off;
+                    }
+                    else
+                    {
+                        desiredState = (FreeControllerV3.RotationState) blendToRotState;
+                    }
+                    SuperController.LogMessage($"**setting {controller.name} rot to {desiredState} from {controller.currentRotationState}");
+                    controller.currentRotationState = desiredState;
+                }
+            }
+            else
+            {
+                if(clipRotState != null && controller.currentRotationState != clipRotState)
+                {
+                    controller.currentRotationState = (FreeControllerV3.RotationState) clipRotState;
+                }
+            }
+
+            if (totalRotationBlendWeights > float.Epsilon)
             {
                 Quaternion targetRotation;
                 if (rotationCount > 1)
@@ -731,11 +836,16 @@ namespace VamTimeline
                 control.rotation = rotation;
             }
 
-            if (totalPositionBlendWeights > float.Epsilon && controller.currentPositionState != FreeControllerV3.PositionState.Off)
+            if (totalPositionBlendWeights > float.Epsilon)
             {
                 var targetPosition = weightedPositionSum / totalPositionBlendWeights;
                 var position = Vector3.Lerp(control.position, targetPosition, totalPositionControlWeights / totalPositionBlendWeights);
                 control.position = position;
+            }
+
+            if(controller.name == "headControl") 
+            {
+                SuperController.LogMessage($"set pos: {control.position} rot: {control.rotation}");
             }
 
             if (force && controller.currentPositionState == FreeControllerV3.PositionState.Comply || controller.currentRotationState == FreeControllerV3.RotationState.Comply)

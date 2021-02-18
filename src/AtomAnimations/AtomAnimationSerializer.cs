@@ -110,6 +110,8 @@ namespace VamTimeline
                     {
                         controlPosition = DeserializeBool(controllerJSON["ControlPosition"], true),
                         controlRotation = DeserializeBool(controllerJSON["ControlRotation"], true),
+                        positionState = DeserializeString(controllerJSON["PositionState"], FreeControllerV3.PositionState.On.ToString()),
+                        rotationState = DeserializeString(controllerJSON["RotationState"], FreeControllerV3.RotationState.On.ToString()),
                         weight = DeserializeFloat(controllerJSON["Weight"], 1f)
                     };
                     if (controllerJSON.HasKey("Parent"))
@@ -388,7 +390,9 @@ namespace VamTimeline
                         { "RotX", SerializeCurve(controller.rotX) },
                         { "RotY", SerializeCurve(controller.rotY) },
                         { "RotZ", SerializeCurve(controller.rotZ) },
-                        { "RotW", SerializeCurve(controller.rotW) }
+                        { "RotW", SerializeCurve(controller.rotW) },
+                        { "PositionState", controller.positionState },
+                        { "RotationState", controller.rotationState }
                     };
                 if (controller.parentRigidbodyId != null)
                 {

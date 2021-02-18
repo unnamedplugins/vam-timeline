@@ -17,6 +17,8 @@ namespace VamTimeline
         private int _lastParentAvailableCheck;
         public string parentAtomId;
         public string parentRigidbodyId;
+        public string positionState = FreeControllerV3.PositionState.On.ToString();
+        public string rotationState = FreeControllerV3.RotationState.On.ToString();
         public Rigidbody parentRigidbody;
         public void SetParent(string atomId, string rigidbodyId)
         {

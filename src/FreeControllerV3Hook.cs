@@ -53,6 +53,22 @@ namespace VamTimeline
 
         private void HandleControllerChanged(FreeControllerV3 controller, bool grabEnd)
         {
+            // SuperController.LogMessage($"Got controller changed event for {controller.name}");
+            // Only track animated targets
+            var target = animationEditContext.current.targetControllers.FirstOrDefault(t => t.controller == controller);
+            if (target == null) return;
+
+            // // If the controller state is intended to be Off, record if we are at clip time of zero
+            // if(target.positionState == FreeControllerV3.PositionState.Off.ToString() || target.rotationState == FreeControllerV3.RotationState.Off.ToString())
+            // {
+            //     if (target.clip.clipTime == 0.0f)
+            //     {
+            //         SuperController.LogMessage($"Recording new keyframe for {controller.name}");
+            //         RecordFreeControllerPosition(target);
+            //         return;
+            //     }
+            // }
+
             // Only record moves in edit mode
             if (!animationEditContext.CanEdit()) return;
 
@@ -64,10 +80,6 @@ namespace VamTimeline
 
             // Ignore comply nodes unless the event is grab end, since they will dispatch during the animation
             if (!grabEnd && (controller.currentRotationState == FreeControllerV3.RotationState.Comply || controller.currentPositionState == FreeControllerV3.PositionState.Comply)) return;
-
-            // Only track animated targets
-            var target = animationEditContext.current.targetControllers.FirstOrDefault(t => t.controller == controller);
-            if (target == null) return;
 
             // Ignore grab release at the end of a mocap recording
             if (animationEditContext.ignoreGrabEnd) return;

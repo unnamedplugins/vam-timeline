@@ -15,6 +15,9 @@ namespace VamTimeline
         float clipTime { get; }
         float scaledWeight { get; }
         UnityEvent onTargetsListChanged { get; }
+        float blendInDuration { get; }
+        string nextAnimationName { get; }
+        string playbackScheduledNextAnimationName { get; }
 
         IEnumerable<IAtomAnimationTargetsList> GetTargetGroups();
     }
